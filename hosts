@@ -1,0 +1,27 @@
+[ansible-commander]
+il-slurmctl.sanbi.ac.za
+
+[freeipa_server]
+il-freeipa.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+
+[hpc:children]
+hpc_compute
+hpc_submit
+hpc_manage
+
+[hpc_compute]
+il-slurmctl.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+il-slurmwn1.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+il-slurmwn2.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+il-slurmwn3.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+il-slurmwn4.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+il-slurmwn5.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+
+[hpc_submit:children]
+galaxy
+
+[hpc_manage]
+il-slurmctl.sanbi.ac.za ansible_python_interpreter=/usr/bin/python3
+
+[galaxy]
+il-galaxy.sanbi.ac.za ansible_python_interpreter=/usr/bin/python

@@ -1,0 +1,2 @@
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:{{ var_slurm_install_dir }}/bin"
+LD_LIBRARY_PATH="{{ var_slurm_install_dir }}/lib:{{ var_slurm_install_dir }}/lib/slurm"

@@ -1,0 +1,38 @@
+---
+
+- name: Install deps for MariaDB
+  apt:
+    name: 
+        - mariadb-server
+        - libmariadb-client-lgpl-dev
+        - libmysqlclient-dev
+    state: present
+
+- name: Install mysql-python module (python 3)
+  apt:
+    name: python3-mysqldb
+  when: ansible_python_version.startswith("3")
+
+- name: Install mysql-python module (python 2)
+  apt:
+    name: python-mysqldb
+  when: ansible_python_version.startswith("2")
+
+- name: Enable MariaDB service
+  service:
+    name: mysql
+    state: started
+    enabled: yes
+
+- name: Create slurm db
+  mysql_db:
+    name: "{{ var_slurm_mariadb_name }}"
+    state: present
+
+- name: Create slurm user
+  mysql_user:
+    name: "{{ var_slurm_mariadb_name }}"
+    password: "{{ var_slurm_mariadb_pass }}"
+    priv: 'slurm.*:ALL'
+    state: present
+

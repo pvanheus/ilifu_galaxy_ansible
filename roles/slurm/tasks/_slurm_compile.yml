@@ -1,0 +1,40 @@
+---
+
+- name: Install build deps for slurm
+  apt:
+    name:
+        - git
+        - gcc
+        - make
+        - ruby
+        - ruby-dev
+        - libpam0g-dev
+        - libmariadb-client-lgpl-dev
+        - libmysqlclient-dev
+    state: present
+
+- name: Get slurm
+  get_url:
+    url: "https://download.schedmd.com/slurm/slurm-{{ var_slurm_version }}.tar.bz2"
+    dest: /tmp/
+
+- name: Extract slurm source
+  unarchive:
+    src: "/tmp/slurm-{{ var_slurm_version }}.tar.bz2"
+    dest: /tmp/
+    remote_src: yes
+
+- name: Compile slurm
+  command: "{{ item }} chdir=/tmp/slurm-{{ var_slurm_version }}"
+  with_items:
+    - "./configure --prefix={{ var_slurm_install_dir }} --sysconfdir={{ var_slurm_install_dir }}/etc/ --enable-pam --with-pam_dir=/lib/x86_64-linux-gnu/security/"
+    - "make -j{{ ansible_processor_vcpus }}"
+    - make contrib
+    - make install
+
+- name: Create directories
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_slurm_install_dir }}/etc"

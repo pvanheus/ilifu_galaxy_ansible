@@ -1,0 +1,4 @@
+# see tool_destinations.yml.sample for a description of
+# what you can do with this file
+default_destination: cluster_default
+verbose: True

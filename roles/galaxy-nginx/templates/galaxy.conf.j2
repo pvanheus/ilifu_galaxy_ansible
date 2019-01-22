@@ -1,0 +1,44 @@
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+
+        # use a variable for convenience
+        set $galaxy_root {{ galaxy_server_dir }};
+
+        # proxy all requests not matching other locations to uWSGI
+        location / {
+            uwsgi_pass 127.0.0.1:4001;
+            uwsgi_param UWSGI_SCHEME $scheme;
+            include uwsgi_params;
+        }
+
+        # serve framework static content
+        location /static/style {
+            alias $galaxy_root/static/style/blue;
+            expires 24h;
+        }
+        location /static {
+            alias $galaxy_root/static;
+            expires 24h;
+        }
+        location /robots.txt {
+            alias $galaxy_root/static/robots.txt;
+            expires 24h;
+        }
+        location /favicon.ico {
+            alias $galaxy_root/static/favicon.ico;
+            expires 24h;
+        }
+
+        # serve visualization and interactive environment plugin static content
+        location ~ ^/plugins/(?<plug_type>.+?)/(?<vis_name>.+?)/static/(?<static_file>.*?)$ {
+            alias $galaxy_root/config/plugins/$plug_type/$vis_name/static/$static_file;
+            expires 24;
+        }
+        
+        location /_x_accel_redirect/ {
+            internal;
+            alias /;
+        }
+    }

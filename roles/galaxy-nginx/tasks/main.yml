@@ -1,0 +1,37 @@
+---
+- block:
+  - name: Install repository for nginx
+    apt_repository:
+      repo: 'ppa:galaxyproject/nginx'
+  - name: Install nginx
+    package: name=nginx-extras state=present
+  - name: Install nginx config settings
+    copy: 
+      dest: /etc/nginx/conf.d/galaxy_nginx_options.conf 
+      src: galaxy_nginx_options.conf
+    notify: restart nginx
+  - name: Install nginx Galaxy configuration
+    template:
+      dest: /etc/nginx/sites-available/galaxy.conf
+      src: galaxy.conf.j2
+    notify: restart nginx
+  - name: Set nginx user to Galaxy user
+    lineinfile:
+      path: /etc/nginx/nginx.conf
+      regexp: "^user .*;"
+      line: "user {{ galaxy_user | default('www-data') }};"
+  # - name: Ensure that upload directory exists
+  #   file:
+  #     path: "{{ galaxy_server_dir }}/upload_store"
+  #     state: directory 
+  #   become: true
+  #   become_user: "{{ galaxy_user }}" 
+  - name: Link Galaxy config to default site config
+    file:
+      dest: /etc/nginx/sites-enabled/default    
+      src: /etc/nginx/sites-available/galaxy.conf
+      state: link
+      force: yes
+    notify: restart nginx
+  become: true
+  

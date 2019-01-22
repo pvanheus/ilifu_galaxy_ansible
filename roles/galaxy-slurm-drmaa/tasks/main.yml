@@ -1,0 +1,66 @@
+---
+- block:
+  - name: Install build dependencies for slurm-drmaa
+    apt:
+      name: build-essential
+      state: present
+    become: yes
+  
+  - name: Fetch slurm-drmaa source
+    get_url:
+      url: "https://github.com/natefoo/slurm-drmaa/releases/download/{{ slurm_drmaa_version }}/slurm-drmaa-{{ slurm_drmaa_version }}.tar.gz"
+      dest: /tmp
+  
+  - name: Extract slurm-drmaa source
+    unarchive:
+      src: /tmp/slurm-drmaa-{{ slurm_drmaa_version }}.tar.gz
+      dest: /tmp/
+      remote_src: yes
+    become: true
+    become_user: slurm
+  
+  - name: Compile slurm-drmaa
+    command: "{{ item }} "
+    args:
+      chdir: "/tmp/slurm-drmaa-{{ slurm_drmaa_version }}"
+      creates: "/tmp/slurm-dramaa-{{ slurm_drmaa_version }}/slurm_drmaa/libdrmaa.la"
+    environment:
+      PATH: "{{ var_slurm_install_dir }}/bin:{{ ansible_env.PATH }}"
+    loop:
+      - "./configure --prefix={{ var_slurm_install_dir }} --sysconfdir={{ var_slurm_install_dir }}/etc --with-slurm-inc={{ var_slurm_install_dir }}/include --with-slurm-lib={{ var_slurm_install_dir }}/lib" 
+      - "make"
+    become: true
+    become_user: "{{ slurm_user|default('slurm') }}"
+
+  - name: Compile slurm-drmaa
+    command: "make install"
+    args:
+      chdir: "/tmp/slurm-drmaa-{{ slurm_drmaa_version }}"
+      creates: "{{ var_slurm_install_dir }}/lib/libdrmaa.so"
+    become: true
+
+  
+  - name: Ensure Python drmaa module is installed
+    pip:
+      virtualenv: "{{ galaxy_server_dir }}/.venv"
+      name: drmaa
+      state: latest
+    become: true
+    become_user: "{{ galaxy_user }}"
+  
+  - name: Copy job_conf.xml in place
+    template:
+      src: "{{ job_conf }}"
+      dest: "{{ galaxy_server_dir }}/config/job_conf.xml"
+    become: true
+    become_user: "{{ galaxy_user }}"
+    notify: restart galaxy
+  
+  - name: Copy tool_destinations.yml in place
+    copy:
+      src: "{{ tool_destinations }}"
+      dest: "{{ galaxy_server_dir }}/config/tool_destinations.yml"
+    become: true
+    become_user: "{{ galaxy_user }}"
+    notify: restart galaxy
+  tags: galaxy-slurm-drmaa

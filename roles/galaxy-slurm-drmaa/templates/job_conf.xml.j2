@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<job_conf>
+    <plugins>
+        <plugin id="local" type="runner" load="galaxy.jobs.runners.local:LocalJobRunner" workers="2"/>
+        <plugin id="slurm" type="runner" load="galaxy.jobs.runners.drmaa:DRMAAJobRunner" workers="2"/>
+    </plugins>
+    <destinations default="cluster_default">
+        <destination id="local" runner="local"/>
+        <destination id="dynamic" runner="dynamic">
+            <param id="type">dtd</param>
+        </destination>
+        <destination id="cluster_default" runner="slurm">
+            <env id="SLURM_CONF">{{ var_slurm_install_dir }}/etc/slurm.conf</env>
+            <param id="nativeSpecification">--mem=10000</param>
+            <resubmit condition="memory_limit_reached" destination="cluster_bigmem" />
+        </destination>
+        <destination id="cluster_bigmem" runner="slurm">
+            <env id="SLURM_CONF">{{ var_slurm_install_dir }}/etc/slurm.conf</env>
+            <param id="nativeSpecification">--mem=20000</param>
+            <resubmit condition="memory_limit_reached" destination="cluste__maxmem" />
+        </destination>
+        <destination id="cluster_maxmem" runner="slurm">
+            <env id="SLURM_CONF">{{ var_slurm_install_dir }}/etc/slurm.conf</env>
+            <param id="nativeSpecification">--mem=40000</param>
+        </destination>
+    </destinations>
+</job_conf>
+

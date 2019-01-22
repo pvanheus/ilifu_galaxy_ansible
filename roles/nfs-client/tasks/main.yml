@@ -1,0 +1,40 @@
+---
+- name: fail when ansible_distribution is unknown
+  fail:
+    msg: "This role is not configured to work for ansible_distribution {{ ansible_distribution }}"
+  when: ansible_distribution not in nfs_client_supported_distributions
+
+- block:
+  - name: install required software
+    package: name="{{ item }}" state=present
+    loop:
+      - nfs-common
+      - autofs
+    when: ansible_distribution == "Ubuntu"
+
+  - name: ensure that autofs config directory exists
+    file: path=/etc/auto.master.d state=directory
+
+  - name: ensure that /net directory exists
+    file: path=/net state=directory
+
+  - name: add autofs configuration for NFS
+    notify: restart autofs
+    copy:
+      dest: /etc/auto.master.d/nfs.autofs
+      content: |
+        /net	/etc/auto.net -nonstrict
+
+  - name: trigger handlers to restart services where config has changed
+    meta: flush_handlers
+
+  - name: create symlinks from automount dir
+    file: path="{{ item.dest }}" src="{{ item.src }}" state=link
+    loop: "{{ automount_links }}"
+    when: automount_links|default([]) != []
+
+  - name: create symlinks from automount dir subdirectories to filesystem
+    file: path="{{ item.dest }}" src="{{ item.src }}" state=link
+    loop: "{{ filesystem_links }}"
+    when: filesystem_links|default([]) != []
+  become: yes

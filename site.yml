@@ -1,0 +1,175 @@
+---
+- name: Site Wide Setup
+  hosts: all:!freeipa_server
+  #hosts: none
+  tags: basics
+  tasks:
+#     - authorized_key:
+#        user: "{{ ansible_ssh_user }}"
+# #       user: root
+#        key: "{{ admin_ssh_public_key }}"
+#       become: yes
+    - include_role:
+        name: freeipa
+
+- name: Setup filesystem and NFS server on il-galaxy
+  tags: nfs_server
+  hosts: il-galaxy.sanbi.ac.za
+  tasks:
+    - apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - nfs-kernel-server
+        - watchdog
+      become: yes
+    - name: mount /data
+      mount:
+        src: /dev/vdb1
+        path: /data
+        fstype: ext4
+        state: mounted
+      become: yes
+    - name: export to 192.168.10.* network
+      lineinfile:
+        path: /etc/exports
+        line: "/data 192.168.10.0/24(rw,no_root_squash,sync)"
+      become: yes
+    - name: run exportfs
+      command: "exportfs -ar"
+      become: yes
+
+
+- name: NFS clients
+  tags: nfs_clients
+  hosts: all:!il-galaxy.sanbi.ac.za
+  tasks:
+    - include_role:
+        name: nfs-client
+
+
+- name: Install Slurm in the cluster
+  hosts: hpc
+  tags: slurm
+  tasks:
+    - include_role:
+       name: slurm
+
+- name: Install Singularity on the cluster
+  hosts: hpc_submit:hpc_compute
+  vars:
+    ansible_become: true
+  tags: singularity
+  tasks:
+    - package:
+        name: build-essential
+        state: present
+    - include_role:
+        name: cyverse-ansible.singularity
+
+- name: Install Galaxy on Galaxy server
+  hosts: galaxy
+  tags: galaxy
+  vars:
+    galaxy_server_dir: '/data/tools/software/galaxy/galaxy'
+    galaxy_config_dir: "{{ galaxy_server_dir }}/config"
+    galaxy_user: galaxy
+    galaxy_group: galaxy
+    galaxy_config_style: yaml
+    galaxy_commit_id: 'release_18.09'
+    galaxy_config:
+      uwsgi:
+        socket: 127.0.0.1:4001
+        buffer-size: 16384
+        processes: 1
+        threads: 4
+        offload-threads: 2
+        static-map:
+          - /static/style={{ galaxy_server_dir }}/static/style/blue
+          - /static={{ galaxy_server_dir }}/static
+        master: true
+        virtualenv: "{{ galaxy_venv_dir }}"
+        pythonpath: "{{ galaxy_server_dir }}/lib"
+        module: 'galaxy.webapps.galaxy.buildapp:uwsgi_app()'
+        thunder-lock: true
+        die-on-term: true
+        hook-master-start:
+          - unix_signal:2 gracefully_kill_them_all
+          - unix_signal:15 gracefully_kill_them_all
+        py-call-osafterfork: true
+        enable-threads: true
+        mule: lib/galaxy/main.py
+        mule: lib/galaxy/main.py
+        farm: 'job-handlers:1,2'
+      galaxy:
+        database_connection: "postgresql:///galaxy?host=/var/run/postgresql"
+        admin_users: 'pvh@sanbi.ac.za,zipho@sanbi.ac.za,thoba@sanbi.ac.za' 
+    postgresql_objects_users:
+      - name: "{{ galaxy_user | default('galaxy') }}"
+    postgresql_objects_databases:
+      - name: "{{ postgresql_objects_users[0]['name'] }}"
+        owner: "{{ postgresql_objects_users[0]['name'] }}"
+  pre_tasks:
+    - block:
+        - name: Create galaxy IPA user "{{ galaxy_user }}"
+          ipa_user:
+            ipa_host: "{{ freeipa_server }}"
+            ipa_pass: "{{ var_freeipa_pass }}"
+            givenname: "Galaxy"
+            sn: "User"
+            uid: "{{ galaxy_user }}"
+            state: present
+        - name: Set postgresql version 9.5 (default)
+          set_fact: 
+            postgresql_version: 9.5
+        - name: Set postgresql version
+          set_fact: 
+            postgresql_version: 9.5
+          when: ansible_distribution_version == "16.04"
+        - name: Install postgresql
+          package: name="{{item}}" state=present
+          loop:
+            - "postgresql-{{postgresql_version}}"
+            - "postgresql-server-dev-{{postgresql_version}}"
+        - name: Install psycopg2
+          package: pkg=python-psycopg2 state=present
+          when: ansible_python_version.startswith("2")
+        - name: Install psycopg2
+          package: pkg=python3-psycopg2 state=present
+          when: ansible_python_version.startswith("3")
+        - name: Install Galaxy Dependencies
+          package:
+            name:
+              - git
+              - python-virtualenv
+            state: present
+        - name: Create Galaxy base directory
+          file:
+            path: "{{ galaxy_server_dir }}"
+            state: directory
+            owner: "{{ galaxy_user }}"
+            mode: "0755"
+      become: yes
+  tasks:
+    - name: Create PostgreSQL user and database
+      include_role:
+        name: natefoo.ansible-postgresql-objects
+      vars:
+        ansible_become: true
+        ansible_become_user: postgres
+    - name: Install Galaxy
+      include_role:
+        name: galaxyprojectdotorg.galaxy
+      vars:
+        ansible_become: true
+        ansible_become_user: "{{ galaxy_user }}"
+    - name: Install supervisord
+      include_role:
+        name: galaxy-supervisord
+    - name: Install nginx
+      include_role:
+        name: galaxy-nginx
+    - name: Install slurm-drmaa module
+      include_role:
+         name: galaxy-slurm-drmaa
+      tags: galaxy-slurm-drmaa

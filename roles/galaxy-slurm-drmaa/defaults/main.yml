@@ -1,0 +1,4 @@
+---
+job_conf: job_conf.xml.j2
+tool_destinations: tool_destinations.yml
+slurm_drmaa_version: 1.2.0-dev.44cc67e

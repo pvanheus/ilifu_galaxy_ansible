@@ -1,0 +1,18 @@
+---
+
+- name: Install FreeIPA client packages
+  package:
+    name: freeipa-client
+    state: present
+  become: true
+
+- name: Check if IPA joined
+  stat:
+    path: /etc/ipa/default.conf
+  register: stat_result
+  changed_when: False
+
+- name: Join FreeIPA
+  command: ipa-client-install --hostname="{{ inventory_hostname }}" --domain="{{ freeipa_domain }}" --server="{{ freeipa_server }}" --realm="{{ freeipa_realm }}" -p admin --password="{{ var_freeipa_pass }}" --force-join --unattended --mkhomedir
+  when: stat_result.stat.exists == False
+  become: true

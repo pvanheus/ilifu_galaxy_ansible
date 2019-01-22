@@ -1,0 +1,4 @@
+---
+- name: restart galaxy
+  command: "supervisorctl restart web"
+  become: true

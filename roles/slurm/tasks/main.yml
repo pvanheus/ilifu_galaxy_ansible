@@ -1,0 +1,42 @@
+---
+
+- block:
+  - name: Configure db
+    include_tasks: 00_prepare_mariadb.yml
+    when: (inventory_hostname in groups['hpc_manage'])
+
+  - name: Configure slurm
+    include_tasks: 00_prepare_slurm.yml
+    when: (inventory_hostname == slurm_master_hostname)
+
+  - name: Slurm dependencies
+    include_tasks: 01_deps.yml
+    
+  - name: Slurm files
+    include_tasks: 02_files.yml
+  
+  - name: Start controller services
+    service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+      - slurmdbd.service
+      - slurmctld.service
+    when: inventory_hostname == slurm_master_hostname
+  
+  - name: Start slurmd
+    service:
+      name: slurmd.service
+      state: started
+      enabled: yes
+    when: (inventory_hostname in groups['hpc_compute'])
+   
+  - name: Copy environment file
+    template:
+      src: "{{ role_path }}/files/environment"
+      dest: /etc/environment
+      mode: 644
+      owner: root
+      group: root
+  become: yes 

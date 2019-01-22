@@ -1,0 +1,68 @@
+---
+
+- name: Install dependencies for Slurm runtime
+  apt:
+    name: 
+        - munge
+        - libmunge-dev
+        - libmunge2
+    state: present
+
+- name: Retrieve key for munge cluster
+  fetch:
+    src: /etc/munge/munge.key
+    dest: "{{ var_conf_dir }}/munge.key"
+    flat: yes
+  when: inventory_hostname != slurm_master_hostname
+
+- name: Check if pub key exists on slurm master
+  stat:
+    path: /root/.ssh/id_rsa
+  register: stat_ssh
+  when: inventory_hostname == slurm_master_hostname
+
+#- name: Generate SSH keys on slurm master
+#  shell: ssh-keygen -b 2048 -t rsa -f /root/.ssh/id_rsa -q -N ""
+#  args:
+#    creates: /root/.ssh/id_rsa
+#  when: (inventory_hostname == slurm_master_hostname) and ( stat_ssh.stat.exists == False | default(False))
+
+#- name: Retrieve public key from slurm master
+#  slurp:
+#    src:  /root/.ssh/id_rsa.pub
+#  register: pubkey
+#  when: inventory_hostname == groups['slurm'][0]
+
+#- name: Distribute public key to cluster
+#  lineinfile:
+#    path: /root/.ssh/authorized_keys
+#    state: present
+#    line: "{{ hostvars[groups['slurm'][0]]['pubkey']['content'] | b64decode }}"
+
+- name: Create munge directory
+  file:
+    path: /etc/munge
+    state: directory
+
+- name: Distribute munge key to all machines
+  copy:
+    src: "{{ var_conf_dir }}/munge.key"
+    dest: /etc/munge/munge.key
+    force: yes
+    mode: 0400
+
+- name: Restart munge service
+  service:
+    name: munge
+    state: restarted
+
+- name: Create runtime directories
+  file:
+    path: "{{ item }}"
+    owner: "{{ slurm_user }}"
+    group: "{{ slurm_group }}"
+    state: directory
+  with_items:
+    - /var/run/slurm
+    - /var/spool/slurm
+    - /var/log/slurm

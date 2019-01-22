@@ -1,0 +1,15 @@
+[Unit]
+Description=Slurm DBD accounting daemon
+After=network.target munge.service
+ConditionPathExists={{ var_slurm_install_dir }}/etc/slurmdbd.conf
+
+[Service]
+Type=forking
+EnvironmentFile=-/etc/sysconfig/slurmdbd
+ExecStart={{ var_slurm_install_dir }}/sbin/slurmdbd $SLURMDBD_OPTIONS &
+ExecReload=/bin/kill -HUP $MAINPID
+PIDFile=/var/run/slurm/slurmdbd.pid
+
+
+[Install]
+WantedBy=multi-user.target
